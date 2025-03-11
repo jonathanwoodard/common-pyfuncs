@@ -1,0 +1,25 @@
+version: 1
+disable_existing_loggers: False
+formatters:
+  baseFormatter:
+    format: '%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(message)s'
+handlers:
+  consoleHandler:
+    class: logging.StreamHandler
+    formatter: baseFormatter
+    level: DEBUG
+    stream: ext://sys.stdout
+  fileHandler:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: baseFormatter
+    level: INFO
+    filename: ./log/sample.log
+    when: 'midnight'
+    utc: True
+    backupCount: 5
+    delay: True
+loggers:
+  generic_log:
+    level: DEBUG
+    handlers: [consoleHandler,fileHandler]
+    formatters: [baseFormatter]
