@@ -42,3 +42,103 @@ the results of the two methods to be directly compared.
 """
 
 
+def pacmap_embed(df,nc=3,nn=70,mn=0.5,fp=2):
+    """
+    This function uses the PacMAP package to embed a high-dimensional
+    data set in an (x, y, z) coordinate system for plotting using the
+    functions above. The 3D dataframe can be merged with the original
+    dataframe to provide values for the plot's `text` field.
+    PacMAP input and output data is numpy array format
+    """
+    # can use a subset of df columns
+    X = df[df.columns[:-1]].to_numpy(copy=True) 
+    embedding = pacmap.PaCMAP(n_components=nc, n_neighbors=nn, MN_ratio=mn, FP_ratio=fp)  
+    t0 = dt.now()
+    X_transformed = embedding.fit_transform(X, init="random") 
+    print(f'Elapsed: {dt.now() - t0}')
+    # The transformed data X_transformed is split into its components: x, y, and z
+    x = X_transformed[:, 0]  # values in the first dimension
+    y = X_transformed[:, 1]  # values in the second dimension
+    z = X_transformed[:, 2]  # values in the third dimension
+    # add xyz coordinates to df
+    df3d = df.copy() 
+    df3d['x'] = x
+    df3d['y'] = y
+    df3d['z'] = z
+    return embedding, df3d
+
+
+def calc_acceptance(met0, met1, met2):
+    """
+    The functions here are somewhat arbitrary. The idea is 
+    to create curves shaped so that when the values for
+    the three metrics approach the desired value, the sum
+    of the values generated will approach some threshold
+    """
+    a = (np.sin(met0*np.pi)**1.7)*0.4
+    a += (((np.cos(met1*np.pi)+1)/2)**3)*0.2
+    a += (50*np.log((met2)/5)/(met2-1)**1.7)*0.5
+    return np.max([a,0])
+
+
+def clustering_iteration(df, mult, n=10):
+    """
+    This function uses the HDBSCAN algorithm to assign cluster ids
+    to a low dimensional data set. The function uses a few simple
+    metrics to determine if the clustering is high quality. These
+    metrics are passed to a scoring function, and the clustering 
+    can be repeated until an 'acceptable' score is reached.
+    Metrics are:
+        met0 - proportion of data points in the largest cluster
+        met1 - proportion of data points not assigned to any cluster
+        met2 - number of clusters identified
+    The value of mult depends on the size of the dataframe
+    """
+    best_score = 0
+    best_clust = None
+    _iter = 0
+    while _iter<n:
+        clust_size = int((df.shape[0]*mult)+np.random.gamma(4.5,20)) # add randomness to iterations
+        clusterer = hdbscan.HDBSCAN(min_cluster_size=clust_size,min_samples=clust_size,
+                                    core_dist_n_jobs=-1).fit(df)
+        df['cluster_id'] = clusterer.labels_
+        met0 = df.cluster_id.value_counts().iloc[0]/df.shape[0]
+        met1 = df[df.cluster_id==-1].shape[0]/df.shape[0]
+        met2 = df['cluster_id'].max()
+        score = calc_acceptance(met0, met1, met2)
+        if (np.abs(0.5 - met0) < 0.15 and met1 < 0.1 and met2 > 7 and met2 <= 11) or score >= 1:
+            best_score = score
+            best_clust = clusterer
+            _iter = n
+        elif score > best_score:
+            best_score = score
+            best_clust = clusterer
+            _iter += 1
+        else:
+            _iter += 1
+    metrics = [met0, met1, met2, best_score]
+    return metrics, best_clust, clusterer
+
+
+def _train_classifer(df):
+    """
+    Create an XGBoost classifier and train on high dimensional data 
+    with both categorical and continuous features
+    """
+    clf = xgb.XGBClassifier(base_score=0.2,colsample_bylevel=0.755,colsample_bytree=0.946,
+                        gamma=0.0558,learning_rate=0.05,max_depth=5,n_estimators=200,n_jobs=-1,
+                        objective='multi:softmax',num_class=num_class,random_state=42,reg_alpha=0.122,
+                        reg_lambda=0.310,subsample=0.911,verbosity=1)
+    clust_feat = ['cat_1', 'cat_2', 'cat_3', 'cat_4',
+                  'cont_1', 'cont_2', 'cont_3']
+    X_clust = pd.get_dummies(df[clust_feat],columns=clust_feat[:-3])
+    # it's helpful to make sure features are in the same order and case
+    X_clust = X_clust[X_clust.columns.sort_values()]
+    lv_df,met0,met1,met2,clusterer = embed_and_cluster(X_clust)
+    num_class = y.unique().shape[0]
+    clf.set_params(num_class=num_class)
+    clf.fit(X_train)
+    return clf
+
+
+
