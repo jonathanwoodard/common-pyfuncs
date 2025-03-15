@@ -8,6 +8,8 @@ import pacmap
 import boto3
 import hdbscan
 import tempfile
+import xgboost as xgb
+from xgboost import plot_importance, plot_tree
 
 
 def basic_3d(df):
@@ -58,27 +60,20 @@ def plotly_scatter_3d(df,bucket,client,key,prefix):
     return response
 
 
-def pacmap_embed(df,nc=3,nn=70,mn=0.5,fp=2):
+def modified_plot_importance(booster, figsize, **kwargs):
     """
-    This function uses the PacMAP package to embed a high-dimensional
-    data set in an (x, y, z) coordinate system for plotting using the
-    functions above. The 3D dataframe can be merged with the original
-    dataframe to provide values for the plot's `text` field.
-    PacMAP input and output data is numpy array format
+    wrapper around xgboost plot_importance function to allow customization
+    saves png to s3
     """
-    # can use a subset of df columns
-    X = df[df.columns[:-1]].to_numpy(copy=True) 
-    embedding = pacmap.PaCMAP(n_components=nc, n_neighbors=nn, MN_ratio=mn, FP_ratio=fp)  
-    t0 = dt.now()
-    X_transformed = embedding.fit_transform(X, init="random") 
-    print(f'Elapsed: {dt.now() - t0}')
-    # The transformed data X_transformed is split into its components: x, y, and z
-    x = X_transformed[:, 0]  # values in the first dimension
-    y = X_transformed[:, 1]  # values in the second dimension
-    z = X_transformed[:, 2]  # values in the third dimension
-    # add xyz coordinates to df
-    df3d = df.copy() 
-    df3d['x'] = x
-    df3d['y'] = y
-    df3d['z'] = z
-    return embedding, df3d
+    title = kwargs['title']
+    client = utils._s3_client('default')
+    _pre = 's3_location'
+    bucket = 's3_bucket'
+    stamp = dt.strftime(dt.now(),'%Y%m%d%H%M%S')
+    fig, ax = plt.subplots(1,1,figsize=figsize)
+    img_name = '{}/importance_{}_{}.png'.format(_pre,title.split()[-1],stamp)
+    xgb.plot_importance(booster=booster, ax=ax, **kwargs)
+    img_data = BytesIO()
+    plt.savefig(img_data, format='png', bbox_inches='tight')
+    r = utils._png_to_s3(img_data, img_name, client, bucket=bucket)
+
