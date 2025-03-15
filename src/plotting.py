@@ -165,3 +165,15 @@ def modified_tree_plot(df,tree,ax,logger,cmap='viridis'):
     ax.invert_yaxis()
     ax.set_ylabel('$\lambda$ value')
     return ax
+
+
+def hexcolormap(map,n):
+    """
+    Helper function to generate a list of hex color codes 
+    from an mpl colormap. Used in the modified tree plot above.
+    """
+    _cm = cm.get_cmap(map)
+    colors = _cm(np.linspace(0, 1, n))
+    rgbmap = np.array([colors[col][:-1] for col in range(n)])
+    hexmap = [('#'+''.join([f'{int(i):02x}' for i in 255*c])) for c in rgbmap]
+    return hexmap
