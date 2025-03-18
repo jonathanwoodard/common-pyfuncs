@@ -141,4 +141,36 @@ def _train_classifer(df):
     return clf
 
 
-
+def train_optimize_clf(X,y,bucket,prefix,key=None,n_calls=150):
+    """
+    Sample function for hyperparameter optimization with scikit-optimize
+    https://scikit-optimize.github.io/stable/user_guide.html
+    """
+    num_class = y.unique().shape[0]
+    today = dt.strftime(dt.today(),'%Y%m%d')
+    # define model
+    clf = xgb.XGBClassifier(base_score=0.2,colsample_bylevel=0.755,colsample_bytree=0.946,
+                            gamma=0.0558,learning_rate=0.05,max_depth=5,n_estimators=200,n_jobs=-1,
+                            objective='multi:softmax',num_class=num_class,random_state=42,reg_alpha=0.122,
+                            reg_lambda=0.310,subsample=0.911,verbosity=1)
+    # define hyperparameter space
+    space = [Real(0.5,0.95,name='subsample'),
+             Real(0.5,0.95,name='colsample_bytree'),
+             Real(0.5,0.95,name='colsample_bylevel'),
+             Real(0.01,5,'log-uniform',name='gamma'),
+             Real(1e-2,10,name='reg_alpha'),
+             Real(0.1,10,name='reg_lambda')]
+    # define objective function for hyperparameter optimization
+    @use_named_args(space)
+    def objective(**params):
+        mdl.set_params(**params)
+        return 1-np.mean(cross_val_score(mdl, X, y, cv=5, n_jobs=-1, scoring='balanced_accuracy'))
+    # optimize hyperparameters
+    res_gb = gbrt_minimize(objective, space, n_calls=n_calls, random_state=42, n_jobs=-1, verbose=True,
+                           callback=[DeadlineStopper(1800)])
+    par = ['subsample','colsample_bytree','colsample_bylevel','gamma','reg_alpha','reg_lambda']
+    _par = dict(zip(par,res_gb.x))
+    mdl.set_params(**_par)
+    mdl.set_params(n_estimators=500)
+    mdl.fit(X,y)
+    return mdl, res_gb
