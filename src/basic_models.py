@@ -17,6 +17,8 @@ from skopt import gp_minimize, forest_minimize, gbrt_minimize, BayesSearchCV
 from skopt.plots import plot_convergence,plot_evaluations,plot_objective
 from skopt.callbacks import DeadlineStopper, VerboseCallback, DeltaXStopper
 from sklearn.pipeline import Pipeline
+import general_s3 as utils
+import slack_alert as slert
 
 
 """
