@@ -174,3 +174,47 @@ def train_optimize_clf(X,y,bucket,prefix,key=None,n_calls=150):
     mdl.set_params(n_estimators=500)
     mdl.fit(X,y)
     return mdl, res_gb
+
+
+def optimization_plots(result,bucket,prefix,mdl):
+    """
+    This function will generate diagnostic plots from skopt and
+    save them to a location in s3
+    """
+    today = dt.strftime(dt.today(),'%Y%m%d')
+    _name = '{}_optimizer_{}_{}.png'
+    messages = {}
+    # convergence plot
+    client = utils._s3_client('default')
+    fig, ax = plt.subplots(1, 1,  figsize=(16, 10))
+    plot_convergence(result, ax=ax)
+    img_name = '/'.join([prefix,_name.format(mdl,'convergence',today)])
+    img_data = BytesIO()
+    plt.savefig(img_data, format='png')
+    r0 = utils._png_to_s3(img_data, img_name, client, bucket=bucket)
+    if r0 is not None:
+        if r0['ResponseMetadata']['HTTPStatusCode'] != 200:
+            messages['convergence'] = r0['ResponseMetadata']
+    # evaluations plot
+    client = utils._s3_client('default')
+    fig = plt.figure()
+    ax = plot_evaluations(result)
+    img_name = '/'.join([prefix,_name.format(mdl,'evaluations',today)])
+    img_data = BytesIO()
+    plt.savefig(img_data, format='png')
+    r1 = utils._png_to_s3(img_data, img_name, client, bucket=bucket)
+    if r1 is not None:
+        if r1['ResponseMetadata']['HTTPStatusCode'] != 200:
+            messages['evaluations'] = r1['ResponseMetadata']
+    # objective plot
+    client = utils._s3_client('default')
+    fig = plt.figure()
+    ax = plot_objective(result)
+    img_name = '/'.join([prefix,_name.format(mdl,'objective',today)])
+    img_data = BytesIO()
+    plt.savefig(img_data, format='png')
+    r2 = utils._png_to_s3(img_data, img_name, client, bucket=bucket)
+    if r1 is not None:
+        if r1['ResponseMetadata']['HTTPStatusCode'] != 200:
+            messages['objective'] = r2['ResponseMetadata']
+    return messages
