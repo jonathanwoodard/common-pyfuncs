@@ -1,0 +1,26 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import pacmap
+import plotly.express as px
+import plotly.graph_objs as go
+import attention_utils as utils
+import re
+
+
+df = pd.read_csv('~/mushrooms.csv')
+_df = pd.get_dummies(df[df.columns[1:]]).astype(int)
+X = _df.to_numpy(copy=True) 
+
+y = df['class']
+embedding = pacmap.PaCMAP(n_components=3, n_neighbors=25, MN_ratio=0.5, FP_ratio=2) 
+X_transformed = embedding.fit_transform(X, init="random")
+x = X_transformed[:, 0]  # values in the first dimension
+y = X_transformed[:, 1]  # values in the second dimension
+z = X_transformed[:, 2]  # values in the third dimension
+# add xyz coordinates to df
+df3d = df.copy() 
+df3d['x'] = x
+df3d['y'] = y
+df3d['z'] = z
