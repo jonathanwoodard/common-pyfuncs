@@ -228,3 +228,16 @@ def _csv_to_redshift(data,client,bucket):
     redshift_engine.dispose()
 
 
+def _regex_filter(_string,_list):
+    """
+    filter a list of strings to only those which match a regex pattern
+    INPUTS
+        _string - str, regex pattern to match
+        _list - list-like, list of string values to filter
+    OUTPUT
+        filtered list
+    """
+    return list(filter(re.compile(_string).search,_list))
+
+
+
