@@ -240,4 +240,26 @@ def _regex_filter(_string,_list):
     return list(filter(re.compile(_string).search,_list))
 
 
-
+def _quarter_start_end(data_date):
+    # extract year and month from data_date
+    if type(data_date) is str:
+        _t0 = dt.strptime(data_date,'%Y-%m-%d')
+        _y, _m = _t0.year, _t0.month
+    else:
+        _y, _m = data_date.year, data_date.month
+    # convert month to calendar quarter
+    _q = (_m - 1) // 3 + 1
+    # get first day of calendar quarter
+    current_quarter = f'{_y}-{3 * (_q - 1) + 1}-1'
+    t0 = dt.strptime(current_quarter,'%Y-%m-%d').date()
+    # generate a date in next quarter and extract year/month
+    _t1 = t0 + td(days=100)
+    n_y, n_m = _t1.year, _t1.month
+    # convert to next quarter
+    n_q = (n_m - 1) // 3 + 1
+    next_quarter = f'{n_y}-{3 * (n_q - 1) + 1}-1'
+    # subtract one day to get last day of current quarter
+    _next_quarter = dt.strptime(next_quarter,'%Y-%m-%d')
+    t1 = (_next_quarter - td(days=1)).date()
+    # return first and last day of quarter as date
+    return t0, t1
